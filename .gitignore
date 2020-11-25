@@ -1,0 +1,13 @@
+*.pyc
+*.pth
+*.png
+__pycache__
+
+# Data files
+*.pkl
+*.csv
+*.xlsx
+
+# Supporting folders
+bio/
+chem/dataset/
