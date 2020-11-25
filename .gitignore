@@ -10,4 +10,4 @@ __pycache__
 
 # Supporting folders
 bio/
-chem/dataset/
+data/dataset/
