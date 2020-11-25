@@ -11,7 +11,7 @@ from rdkit.Chem import Descriptors
 from rdkit.Chem import AllChem
 from rdkit import DataStructs
 from rdkit.Chem.rdMolDescriptors import GetMorganFingerprintAsBitVect
-from torch.utils import torch_data
+from torch.utils import data as torch_data
 from torch_geometric.data import Data
 from torch_geometric.data import InMemoryDataset
 from torch_geometric.data import Batch
@@ -340,11 +340,10 @@ class MoleculeDataset(InMemoryDataset):
 
     def get(self, idx):
         d = Data()
-        for key in self.d.keys:
-            item, slices = self.d[key], self.slices[key]
+        for key in self.data.keys:
+            item, slices = self.data[key], self.slices[key]
             s = list(repeat(slice(None), item.dim()))
-            s[d.__cat_dim__(key, item)] = slice(slices[idx],
-                                                    slices[idx + 1])
+            s[d.__cat_dim__(key, item)] = slice(slices[idx], slices[idx + 1])
             d[key] = item[s]
         return d
 
@@ -399,10 +398,12 @@ class MoleculeDataset(InMemoryDataset):
         
         data_list = []
         for i in range(len(ids)):
+            if i % 10000 == 0:
+                print("\tFeaturized %d molecules" % i)
             d = mol_to_graph_data_obj_simple(rdkit_mol_objs[i])
             d.id = torch.tensor([ids[i]])
             if labels is not None:
-                d.y = torch.tensor(labels[i, :])
+                d.y = torch.tensor(labels[i])
             data_list.append(d)
         return data_list
 
@@ -576,6 +577,8 @@ def _load_zinc_dataset(input_path):
     rdkit_mol_objs_list = []
     ids = []
     for id, smi in zip(zinc_id_list, smiles_list):
+        if len(ids) % 10000 == 0:
+            print("\tLoaded %d molecules" % len(ids))
         try:
             rdkit_mol = AllChem.MolFromSmiles(smi)
             if not rdkit_mol is None:  # ignore invalid mol objects
@@ -622,6 +625,8 @@ def _load_chembl_with_labels_dataset(raw_folder):
     mol_list = []
     smiles = []
     for i, mol in enumerate(rdkitArr):
+        if len(valid_mol_idx) % 10000 == 0:
+            print("\tLoaded %d molecules" % len(valid_mol_idx))
         if not mol is None:
             mol_species_list = split_rdkit_mol_obj(mol)
             if len(mol_species_list) > 0:
@@ -649,7 +654,7 @@ def _load_bbbp_dataset(input_path, remove_invalid_mols=True):
     labels = input_df['p_np']
     # convert 0 to -1
     labels = labels.replace(0, -1)
-    labels = labels.values
+    labels = labels.values.reshape((labels.shape[0], -1)) # Make sure label is 2D
     # there are no nans
 
     # Mask invalid molecules
@@ -679,7 +684,7 @@ def _load_clintox_dataset(input_path, remove_invalid_mols=True):
     labels = input_df[tasks]
     # convert 0 to -1
     labels = labels.replace(0, -1)
-    labels = labels.values
+    labels = labels.values.reshape((labels.shape[0], -1))
     # there are no nans
     
     # Mask invalid molecules
@@ -707,7 +712,7 @@ def _load_hiv_dataset(input_path, remove_invalid_mols=False):
     labels = input_df['HIV_active']
     # convert 0 to -1
     labels = labels.replace(0, -1)
-    labels = labels.values
+    labels = labels.values.reshape((labels.shape[0], -1))
     # there are no nans
     # No invalid molecules in esol
     assert len(smiles_list) == len(rdkit_mol_objs_list)
@@ -731,7 +736,7 @@ def _load_tox21_dataset(input_path, remove_invalid_mols=False):
     labels = labels.replace(0, -1)
     # convert nan to 0
     labels = labels.fillna(0)
-    labels = labels.values
+    labels = labels.values.reshape((labels.shape[0], -1))
     assert len(smiles_list) == len(rdkit_mol_objs_list)
     assert len(smiles_list) == len(labels)
     return smiles_list, rdkit_mol_objs_list, labels
@@ -748,7 +753,7 @@ def _load_esol_dataset(input_path, remove_invalid_mols=False):
     smiles_list = input_df['smiles']
     rdkit_mol_objs_list = [AllChem.MolFromSmiles(s) for s in smiles_list]
     labels = input_df['measured log solubility in mols per litre']
-    labels = labels.values
+    labels = labels.values.reshape((labels.shape[0], -1))
     # No invalid molecules in esol
     assert len(smiles_list) == len(rdkit_mol_objs_list)
     assert len(smiles_list) == len(labels)
@@ -765,7 +770,7 @@ def _load_freesolv_dataset(input_path, remove_invalid_mols=False):
     smiles_list = input_df['smiles']
     rdkit_mol_objs_list = [AllChem.MolFromSmiles(s) for s in smiles_list]
     labels = input_df['expt']
-    labels = labels.values
+    labels = labels.values.reshape((labels.shape[0], -1))
     assert len(smiles_list) == len(rdkit_mol_objs_list)
     assert len(smiles_list) == len(labels)
     return smiles_list, rdkit_mol_objs_list, labels
@@ -781,7 +786,7 @@ def _load_lipophilicity_dataset(input_path, remove_invalid_mols=False):
     smiles_list = input_df['smiles']
     rdkit_mol_objs_list = [AllChem.MolFromSmiles(s) for s in smiles_list]
     labels = input_df['exp']
-    labels = labels.values
+    labels = labels.values.reshape((labels.shape[0], -1))
     assert len(smiles_list) == len(rdkit_mol_objs_list)
     assert len(smiles_list) == len(labels)
     return smiles_list, rdkit_mol_objs_list, labels
